@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quaker Meeting Houses of New England</title>
+
+    <!-- Add pico css -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/@picocss/pico@latest/css/pico.min.css"
+    />
+
+    <style>
+      :root {
+        --spacing: 0.4rem;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main class="container">
+      <h1>Quaker Meetings Houses of New England</h1>
+      <p>
+        This project seeks to collect information about historic meetings houses
+        of the Society of Friends in New England between 1672 and 1850. It was
+        created as an example research project to be used with a tutorial hosted
+        by
+        <i
+          ><a href="https://programminghistorian.org/"
+            >Programming Historian</a
+          ></i
+        >. The data presented below was collected from a number of sources:
+      </p>
+      <ul>
+        <li>
+          Benes, Peter. <i>Meetinghouses of Early New England</i> University of
+          Massachusetts Press, 2012.
+        </li>
+        <li>
+          <a href="https://preservation.ri.gov/"
+            >The Rhode Island Historical Preservation and Heritage Commission</a
+          >
+        </li>
+        <li>
+          <a href="https://mhc-macris.net/#!/"
+            >Massachusetts Historical Commission</a
+          >
+        </li>
+      </ul>
+      <p>
+        Each meeting house is presented with its initial year of construction,
+        its location, whether or not it is still standing, and any links to
+        relevant online resources.
+      </p>
+      <section>
+        <select id="filter">
+          <option value="ALL">All states</option>
+          <option value="CT">CT</option>
+          <option value="MA">MA</option>
+          <option value="ME">ME</option>
+          <option value="RI">RI</option>
+          <option value="VT">VT</option>
+        </select>
+        <div id="insert-here"></div>
+      </section>
+    </main>
+
+    <script>
+      let data = [];
+      const filterDropdown = document.getElementById("filter");
+
+      const spreadsheetId = "1NSugcxvgZ6Q23igr2ypRwpI7riFtoQruC1YuAHYvB9E";
+      async function fetchData() {
+        const res = await fetch(
+          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json`
+        );
+        const text = await res.text();
+        return JSON.parse(text.substr(47).slice(0, -2));
+      }
+
+      function parseJSON(json) {
+        const header = [];
+        for (const value in json.table.cols) {
+          header.push(json.table.cols[value].label);
+        }
+        for (const row in json.table.rows) {
+          entry = {};
+          for (const [index, col] of header.entries()) {
+            entry[col] = json.table.rows[row].c[index]?.v ?? 0;
+          }
+          data.push(entry);
+        }
+        return data;
+      }
+
+      function createArticle(row) {
+        let html = "";
+
+        let standing = "";
+        if (row.standing) {
+          standing = "standing";
+        } else {
+          standing = "no longer standing";
+        }
+
+        let size = `<li>Size: ${row.size}.</li>`;
+
+        let notes = "";
+        if (row.notes) {
+          notes = `<li>Notes: ${row.notes}</li>`;
+        }
+
+        let historic_link = "";
+        if (row.historic_register) {
+          historic_link = `<footer>A online record of this building can be found <a href="${row.historic_register}">here</a>.</footer>`;
+        }
+
+        const article = `
+        <article>
+          <header><u>${row.date} - ${row.city}, ${row.state}</u> <span style="float: right">${standing}</span></header>
+            <ul>
+              ${size}
+              ${notes}
+            </ul>
+            ${historic_link}
+          </article>
+        `;
+        return article;
+      }
+
+      div = document.getElementById("insert-here");
+      function renderList(rows) {
+        html = "";
+        for (const row in rows) {
+          if (rows[row].publish) {
+            html += createArticle(rows[row]);
+          }
+        }
+
+        div.innerHTML = html;
+      }
+
+      function filterList(event) {
+        switch (event.target.value) {
+          case "ALL":
+            renderList(data);
+            break;
+          case "CT":
+            renderList(data.filter((row) => row.state == "CT"));
+            break;
+          case "MA":
+            renderList(data.filter((row) => row.state == "MA"));
+            break;
+          case "ME":
+            renderList(data.filter((row) => row.state == "ME"));
+            break;
+          case "RI":
+            renderList(data.filter((row) => row.state == "RI"));
+            break;
+          case "VT":
+            renderList(data.filter((row) => row.state == "VT"));
+            break;
+          default:
+            renderList(data);
+        }
+      }
+
+      filterDropdown.addEventListener("change", filterList);
+
+      fetchData().then((json) => {
+        data = parseJSON(json);
+        renderList(data);
+      });
+    </script>
+  </body>
+</html>
