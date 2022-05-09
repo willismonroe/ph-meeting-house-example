@@ -105,11 +105,11 @@
           standing = "no longer standing";
         }
 
-        let size = `<li>Size: ${row.size}.</li>`;
+        let size = `<p>Size: ${row.size}.</p>`;
 
         let notes = "";
         if (row.notes) {
-          notes = `<li>Notes: ${row.notes}</li>`;
+          notes = `<p>Notes: ${row.notes}</p>`;
         }
 
         let historic_link = "";
@@ -120,10 +120,8 @@
         const article = `
         <article>
           <header><u>${row.date} - ${row.city}, ${row.state}</u> <span style="float: right">${standing}</span></header>
-            <ul>
               ${size}
               ${notes}
-            </ul>
             ${historic_link}
           </article>
         `;
