@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quaker Meeting Houses of New England</title>
+
+  <!-- Add pico css -->
+  <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@latest/css/pico.min.css" />
+
+  <style>
+    :root {
+      --spacing: 0.4rem;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <h1>Quaker Meetings Houses of New England</h1>
+    <p>
+      This project seeks to collect information about historic meetings houses
+      of the Society of Friends in New England between 1672 and 1850. It was
+      created as an example research project to be used with a tutorial hosted
+      by
+      <i><a href="https://programminghistorian.org/">Programming Historian</a></i>. The data presented below was
+      collected from a number of sources:
+    </p>
+    <ul>
+      <li>
+        Benes, Peter. <i>Meetinghouses of Early New England</i> University of
+        Massachusetts Press, 2012.
+      </li>
+      <li>
+        <a href="https://preservation.ri.gov/">The Rhode Island Historical Preservation and Heritage Commission</a>
+      </li>
+      <li>
+        <a href="https://mhc-macris.net/#!/">Massachusetts Historical Commission</a>
+      </li>
+    </ul>
+    <p>
+      Each meeting house is presented with its initial year of construction,
+      its location, whether or not it is still standing, and any links to
+      relevant online resources.
+    </p>
+    <section>
+      <select id="filter">
+        <option value="ALL">All states</option>
+        <option value="CT">CT</option>
+        <option value="MA">MA</option>
+        <option value="ME">ME</option>
+        <option value="RI">RI</option>
+        <option value="VT">VT</option>
+      </select>
+      <div id="insert-here"></div>
+    </section>
+  </main>
+
+  <script>
+    // This variable will hold all of the data that we fetch from our spreadsheet, it starts as an empty array.
+    let data = [];
+    // This variable will hold the id for your spreadsheet to be used later.
+    const spreadsheetId = "1NSugcxvgZ6Q23igr2ypRwpI7riFtoQruC1YuAHYvB9E";
+    // We want to create a new function that fetches the data, this will be called when the page loads. It's asynchronous because fetching takes time.
+    async function fetchData() {
+      // We fetch the data via the json endpoint from Google Sheets and store the response in a temporary variable.
+      const res = await fetch(
+        `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:json`
+      );
+      // We turn the response into text.
+      const text = await res.text();
+      // Finally we slice the beginning off of the text and turn it into JSON.
+      return JSON.parse(text.substr(47).slice(0, -2));
+    }
+
+    // Next we need a function that turns the JSON representation of the sheet into our data variable from above.
+    function parseJSON(json) {
+      // We define a variable to hold the column headings.
+      let header = [];
+      // We iterate over the headings and add them to the header variable.
+      for (const value in json.table.cols) {
+        header.push(json.table.cols[value].label);
+      }
+      // Now we iterate over each row of the table (in JSON) and add them to a temporary variable representing a row of the table.
+      for (const row in json.table.rows) {
+        entry = {};
+        for (const [index, col] of header.entries()) {
+          // JSON doesn't store the data in a predictable order, so we fetch each column of the row by the index of its header. If it doesn't exist we just record "0".
+          entry[col] = json.table.rows[row].c[index]?.v ?? 0;
+        }
+        // Once we've done that we add that row to the data variable.
+        data.push(entry);
+      }
+    }
+
+
+    // This function takes a single row of the data variable and creates a complete HTML article tag (and child tags) based on the values of each column.          
+    function createArticle(row) {
+      // We started by making a blank string that will hold the HTML that we will add to it in the subsequent lines.
+      let html = "";
+
+      // In this case we're going to check if the "standing" column is true or false (1 or 0) and change the message based on that result.
+      let standing = "";
+      if (row.standing) {
+        standing = "standing";
+      } else {
+        standing = "no longer standing";
+      }
+
+      // Here we take the value of the "size" column and stick in a <p>aragraph tag.
+      let size = `<p>Size: ${row.size}.</p>`;
+
+      // Similar to "standing" above, if there are any notes we put them into the notes variable, if not, it remains empty.
+      let notes = "";
+      if (row.notes) {
+        notes = `<p>Notes: ${row.notes}</p>`;
+      }
+
+      // Same as above, if there's a link it gets added as a footer, otherwise this string is blank (and has no effect).
+      let historic_link = "";
+      if (row.historic_register) {
+        historic_link =
+          `<footer>A online record of this building can be found <a href="${row.historic_register}">here</a>.</footer>`;
+      }
+
+      // Using javascript's template literals, we can now slot in each of those variables we created above (and some literal values that we pull from the spreadsheet: date, city, state). We augment these with more html to give the text some additional markup. 
+      const article = `
+  <article>
+    <header>
+      <u>${row.date} - ${row.city}, ${row.state}</u> <span style="float: right">${standing}</span>
+    </header>
+    ${size}
+    ${notes}
+    ${historic_link}
+  </article>
+  `;
+      // Once that's done we return the article tag as a string to be added to the webpage by another function.
+      return article;
+    }
+
+
+    // We need to get the location where we're going to add our custom data, in this case we've give that particular html tag the id of "insert-here".
+    div = document.getElementById("insert-here");
+    // This function takes all the rows of the data variable and creates the unique html for each row. 
+    function renderList(rows) {
+      // As before we start with an empty variable holding the html string that we will create.
+      html = "";
+      // Then we iterate through each row in the data.
+      for (const row in rows) {
+        // It's important to check if the column "publish" is set to true, if so we can process the row and add its html to the longer list.
+        if (rows[row].publish) {
+          // If the row is set to publish we create the html and append it to our growing string.
+          html += createArticle(rows[row]);
+        }
+      }
+
+      // Finally, once all rows have been process we add them all to the inside of the div-tag that we identified at the top of the code-block.
+      div.innerHTML = html;
+    }
+
+    // I added some custom code to basic filtering with a dropdown selector
+    function filterList(event) {
+      switch (event.target.value) {
+        case "ALL":
+          renderList(data);
+          break;
+        case "CT":
+          renderList(data.filter((row) => row.state == "CT"));
+          break;
+        case "MA":
+          renderList(data.filter((row) => row.state == "MA"));
+          break;
+        case "ME":
+          renderList(data.filter((row) => row.state == "ME"));
+          break;
+        case "RI":
+          renderList(data.filter((row) => row.state == "RI"));
+          break;
+        case "VT":
+          renderList(data.filter((row) => row.state == "VT"));
+          break;
+        default:
+          renderList(data);
+      }
+    }
+
+    const filterDropdown = document.getElementById("filter");
+    filterDropdown.addEventListener("change", filterList);
+
+    // A static version of the JSON export from the spreadsheet.
+    const spreadsheetJSON = JSON.parse(`{"version":"0.6","reqId":"0","status":"ok","sig":"1426923876","table":{"cols":[{"id":"A","label":"publish","type":"number","pattern":"General"},{"id":"B","label":"date","type":"number","pattern":"General"},{"id":"C","label":"city","type":"string"},{"id":"D","label":"state","type":"string"},{"id":"E","label":"size","type":"string"},{"id":"F","label":"standing","type":"number","pattern":"General"},{"id":"G","label":"notes","type":"string"},{"id":"H","label":"historic_register","type":"string"}],"rows":[{"c":[{"v":1.0,"f":"1"},{"v":1672.0,"f":"1672"},{"v":"Newport"},{"v":"RI"},{"v":"unknown"},{"v":0.0,"f":"0"},{"v":"Perhaps Nicholas Easton\u0027s house later bequeathed to the Newport Friends. Dismantled by 1710."},{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1699.0,"f":"1699"},{"v":"Dartmouth"},{"v":"MA"},{"v":"35x30"},{"v":0.0,"f":"0"},{"v":"Interior had 14 posts"},{"v":"https://www.dartmouthhas.org/uploads/1/0/0/2/100287044/men_1699_-_1727_block_16.pdf"}]},{"c":[{"v":1.0,"f":"1"},{"v":1699.0,"f":"1699"},{"v":"East Greenwich"},{"v":"RI"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1699.0,"f":"1699"},{"v":"Newport"},{"v":"RI"},{"v":"46x45"},{"v":1.0,"f":"1"},{"v":"Original building had a square roof and two tiers of galleries, was expanded in 1808 and 1857."},{"v":"https://preservation.ri.gov/pdfs_zips_downloads/national_pdfs/newport/newp_newport-hd.pdf"}]},{"c":[{"v":1.0,"f":"1"},{"v":1700.0,"f":"1700"},{"v":"Little Compton"},{"v":"RI"},{"v":"unknown"},{"v":1.0,"f":"1"},null,{"v":"https://preservation.ri.gov/pdfs_zips_downloads/national_pdfs/little_compton/ltco_west-main-road-234_friends-meeting-house-and-cemetery.pdf"}]},{"c":[{"v":1.0,"f":"1"},{"v":1700.0,"f":"1700"},{"v":"Portsmouth"},{"v":"RI"},{"v":"unknown"},{"v":1.0,"f":"1"},{"v":"Double doors."},{"v":"https://preservation.ri.gov/pdfs_zips_downloads/national_pdfs/portsmouth/port_middle-road-11_portsmouth-friends-meeting-house.pdf"}]},{"c":[{"v":1.0,"f":"1"},{"v":1702.0,"f":"1702"},{"v":"Somerset"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},null,{"v":"https://mhc-macris.net/#!/details?mhcid=SOM.4"}]},{"c":[{"v":1.0,"f":"1"},{"v":1703.0,"f":"1703"},{"v":"Saylesville"},{"v":"RI"},{"v":"unknown"},{"v":1.0,"f":"1"},{"v":"Expanded in 1745, has a stone horse mounting block outside."},{"v":"https://preservation.ri.gov/pdfs_zips_downloads/national_pdfs/lincoln/linc_smithfield-avenue_saylesville-meeting-house.pdf"}]},{"c":[{"v":1.0,"f":"1"},{"v":1704.0,"f":"1704"},{"v":"Providence"},{"v":"RI"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1706.0,"f":"1706"},{"v":"North Pempbroke"},{"v":"MA"},{"v":"28x28"},{"v":1.0,"f":"1"},{"v":"Structure was built in Scituate, has a large porch with two doors."},{"v":"https://mhc-macris.net/#!/details?mhcid=PEM.1"}]},{"c":[{"v":1.0,"f":"1"},{"v":1717.0,"f":"1717"},{"v":"Dartmouth"},{"v":"MA"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1717.0,"f":"1717"},{"v":"Rochester"},{"v":"MA"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1719.0,"f":"1719"},{"v":"Woonsocket"},{"v":"RI"},{"v":"20x20"},{"v":0.0,"f":"0"},{"v":"Built by John Arnold."},{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1720.0,"f":"1720"},{"v":"Warwick"},{"v":"RI"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1723.0,"f":"1723"},{"v":"Lynn"},{"v":"MA"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1725.0,"f":"1725"},{"v":"Freetown"},{"v":"MA"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1725.0,"f":"1725"},{"v":"Providence"},{"v":"RI"},{"v":"30x70"},{"v":1.0,"f":"1"},{"v":"Became a private residence in 1844."},{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1729.0,"f":"1729"},{"v":"Acushnet"},{"v":"MA"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1729.0,"f":"1729"},{"v":"Cranston"},{"v":"RI"},{"v":"unknown"},{"v":0.0,"f":"0"},{"v":"Building was enlarged in 1819 and then torn down in 1955."},{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1734.0,"f":"1734"},{"v":"Jamestown"},{"v":"RI"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1742.0,"f":"1742"},{"v":"Leicester"},{"v":"MA"},{"v":"20x22"},{"v":0.0,"f":"0"},{"v":"Became a private residence in 1791."},{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1742.0,"f":"1742"},{"v":"New Milford"},{"v":"CT"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1743.0,"f":"1743"},{"v":"Newburyport"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},null,{"v":"https://mhc-macris.net/#!/details?mhcid=NWB.520"}]},{"c":[{"v":1.0,"f":"1"},{"v":1744.0,"f":"1744"},{"v":"Westerly"},{"v":"RI"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1752.0,"f":"1752"},{"v":"Falmouth"},{"v":"ME"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1755.0,"f":"1755"},{"v":"Richmond"},{"v":"RI"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1759.0,"f":"1759"},{"v":"Acushnet"},{"v":"MA"},{"v":"40x28"},{"v":1.0,"f":"1"},null,{"v":"https://mhc-macris.net/#!/details?mhcid=ACU.12"}]},{"c":[{"v":1.0,"f":"1"},{"v":1760.0,"f":"1760"},{"v":"Providence"},{"v":"RI"},{"v":"28x39"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1760.0,"f":"1760"},{"v":"Providence"},{"v":"RI"},{"v":"28x38"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1761.0,"f":"1761"},{"v":"Dartmouth"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1768.0,"f":"1768"},{"v":"Dover"},{"v":"NH"},{"v":"unknown"},{"v":1.0,"f":"1"},{"v":"Porch with two doors."},{"v":"https://npgallery.nps.gov/NRHP/GetAsset/NRHP/80000421_text"}]},{"c":[{"v":1.0,"f":"1"},{"v":1768.0,"f":"1768"},{"v":"Falmouth"},{"v":"ME"},{"v":"40x32"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1770.0,"f":"1770"},{"v":"Uxbridge"},{"v":"MA"},{"v":"35x30"},{"v":1.0,"f":"1"},{"v":"Builtin brick, cost £206."},{"v":"https://mhc-macris.net/#!/details?mhcid=UXB.73"}]},{"c":[{"v":1.0,"f":"1"},{"v":1774.0,"f":"1774"},{"v":"Lee"},{"v":"NH"},{"v":"unknown"},{"v":1.0,"f":"1"},{"v":"Turned into a school."},{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1779.0,"f":"1779"},{"v":"Windham"},{"v":"ME"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1784.0,"f":"1784"},{"v":"New Milford"},{"v":"CT"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1785.0,"f":"1785"},{"v":"Danby"},{"v":"VT"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1785.0,"f":"1785"},{"v":"New Bedford"},{"v":"MA"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1786.0,"f":"1786"},{"v":"Adams"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},{"v":"Two doors."},{"v":"https://mhc-macris.net/#!/details?mhcid=ADA.38"}]},{"c":[{"v":1.0,"f":"1"},{"v":1786.0,"f":"1786"},{"v":"Jamestown"},{"v":"RI"},{"v":"26x20"},{"v":1.0,"f":"1"},null,{"v":"https://preservation.ri.gov/pdfs_zips_downloads/national_pdfs/jamestown/jams_north-road_friends-meeting-house.pdf"}]},{"c":[{"v":1.0,"f":"1"},{"v":1790.0,"f":"1790"},{"v":"Dartmouth"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},null,{"v":"https://mhc-macris.net/#!/details?mhcid=DAR.66"}]},{"c":[{"v":1.0,"f":"1"},{"v":1791.0,"f":"1791"},{"v":"Leicester"},{"v":"MA"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1796.0,"f":"1796"},{"v":"Bolton"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},{"v":"Structure was moved to Old Sturbridge Village, has two doors."},{"v":"https://www.osv.org/building/friends-meetinghouse/"}]},{"c":[{"v":1.0,"f":"1"},{"v":1799.0,"f":"1799"},{"v":"Henniker"},{"v":"NH"},{"v":"unknown"},{"v":1.0,"f":"1"},{"v":"Two doors."},{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1804.0,"f":"1804"},{"v":"East Greenwich"},{"v":"RI"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1805.0,"f":"1805"},{"v":"Danby"},{"v":"VT"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1809.0,"f":"1809"},{"v":"South Yarmouth"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},null,{"v":"https://mhc-macris.net/#!/details?mhcid=YAR.522"}]},{"c":[{"v":1.0,"f":"1"},{"v":1810.0,"f":"1810"},{"v":"East Sandwich"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},null,{"v":"https://mhc-macris.net/#!/details?mhcid=SDW.65"}]},{"c":[{"v":1.0,"f":"1"},{"v":1812.0,"f":"1812"},{"v":"East Blackstone"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},null,{"v":"https://mhc-macris.net/#!/details?mhcid=BLK.313"}]},{"c":[{"v":1.0,"f":"1"},{"v":1813.0,"f":"1813"},{"v":"Westport"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1814.0,"f":"1814"},{"v":"Casco"},{"v":"ME"},{"v":"unknown"},{"v":1.0,"f":"1"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1816.0,"f":"1816"},{"v":"Lynn"},{"v":"MA"},{"v":"unknown"},{"v":0.0,"f":"0"},null,{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1819.0,"f":"1819"},{"v":"South Dartmouth"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},{"v":"Building included an organ."},{"v":"https://mhc-macris.net/#!/details?mhcid=DAR.81"}]},{"c":[{"v":1.0,"f":"1"},{"v":1820.0,"f":"1820"},{"v":"Acworth"},{"v":"NH"},{"v":"unknown"},{"v":1.0,"f":"1"},{"v":"Two doors."},{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1820.0,"f":"1820"},{"v":"Unity"},{"v":"NH"},{"v":"unknown"},{"v":1.0,"f":"1"},{"v":"Two doors."},{"v":null}]},{"c":[{"v":1.0,"f":"1"},{"v":1822.0,"f":"1822"},{"v":"New Bedford"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},null,{"v":"https://mhc-macris.net/#!/details?mhcid=NBE.2031"}]},{"c":[{"v":1.0,"f":"1"},{"v":1825.0,"f":"1825"},{"v":"Coventry"},{"v":"RI"},{"v":"unknown"},{"v":1.0,"f":"1"},null,{"v":"https://preservation.ri.gov/pdfs_zips_downloads/national_pdfs/coventry/covn_anthony-village_hd.pdf"}]},{"c":[{"v":1.0,"f":"1"},{"v":1827.0,"f":"1827"},{"v":"Mattapoisett"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},{"v":"Roof changed after construction."},{"v":"https://mhc-macris.net/#!/details?mhcid=MAT.201"}]},{"c":[{"v":1.0,"f":"1"},{"v":1838.0,"f":"1838"},{"v":"Nantucket"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},null,{"v":"https://mhc-macris.net/#!/details?mhcid=NAN.6"}]},{"c":[{"v":1.0,"f":"1"},{"v":1841.0,"f":"1841"},{"v":"Falmouth"},{"v":"MA"},{"v":"unknown"},{"v":1.0,"f":"1"},null,{"v":"https://mhc-macris.net/#!/details?mhcid=FAL.354"}]}],"parsedNumHeaders":1}}`)
+
+    // This code is not a function or variable definition, this is actually what runs when the page loads, first we fetch the data using the fetchData() function, then once that has been received, we process, and render the data on the page.
+    parseJSON(spreadsheetJSON);
+    renderList(data);
+  </script>
+</body>
+
+</html>
